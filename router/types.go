@@ -63,6 +63,7 @@ type Route struct {
 	FilterName    string            `json:"filter_name,omitempty"`
 	FilterSources []string          `json:"filter_sources,omitempty"`
 	FilterLabels  []string          `json:"filter_labels,omitempty"`
+	FilterLabelsExclude  []string   `json:"filter_labels_exclude,omitempty"`
 	Adapter       string            `json:"adapter"`
 	Address       string            `json:"address"`
 	Options       map[string]string `json:"options,omitempty"`
@@ -105,7 +106,7 @@ func (r *Route) Close() {
 }
 
 func (r *Route) matchAll() bool {
-	if r.FilterID == "" && r.FilterName == "" && len(r.FilterSources) == 0 && len(r.FilterLabels) == 0 {
+	if r.FilterID == "" && r.FilterName == "" && len(r.FilterSources) == 0 && len(r.FilterLabels) == 0 && len(r.FilterLabelsExclude) == 0 {
 		return true
 	}
 	return false
@@ -135,6 +136,17 @@ func (r *Route) MatchContainer(id, name string, labels map[string]string) bool {
 			labelValue := labelParts[1]
 			labelMatch, labelErr := path.Match(labelValue, labels[labelKey])
 			if labelErr != nil || (labelValue != "" && !labelMatch) {
+				return false
+			}
+		}
+	}
+	for _,label := range r.FilterLabelsExclude {
+		labelParts := strings.SplitN(label, ":", 2)
+		if len(labelParts) > 1 {
+			labelKey := labelParts[0]
+			labelValue := labelParts[1]
+			labelMatch, labelErr := path.Match(labelValue, labels[labelKey])
+			if labelErr != nil || (labelValue != "" && labelMatch) {
 				return false
 			}
 		}
