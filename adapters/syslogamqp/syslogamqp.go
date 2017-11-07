@@ -3,15 +3,12 @@ package syslogamqp
 import (
 	"bytes"
 	"errors"
-	"strings"
 	"fmt"
 	"io/ioutil"
 	"log"
 	"net"
 	"log/syslog"
 	"os"
-	"regexp"
-	"os/exec"
 	"strconv"
 	"syscall"
 	"text/template"
@@ -59,25 +56,6 @@ func debug(v ...interface{}) {
 	}
 }
 
-func nslookup(host string) (string, error) {
-	var cmdOut []byte
-  cmdName := "nslookup"
-  cmdArgs := []string{host}
-	cmdOut, _ = exec.Command(cmdName, cmdArgs...).Output()
-
-	matchIpv4 := regexp.MustCompile("\\b((\\d+\\.){3}\\d+)\\b")
-	matches := matchIpv4.FindAllStringSubmatch(string(cmdOut), -1)
-
-  match := make([]string, 0)
-  if len(matches) > 0 {
-    match = matches[len(matches)-1]
-  }
-  if match != nil && len(match) > 1 {
-	  return match[1], nil
-  }
-	return  "", fmt.Errorf("nslookup %s returned:\n %s.\n\n", host, cmdOut)
-}
-
 // NewSyslogAMQPAdapter returnas a configured syslog.Adapter
 func NewSyslogAMQPAdapter(route *router.Route) (router.LogAdapter, error) {
 	//uri := "amqp://" + a.user + ":" + a.password + "@" + a.address
@@ -97,25 +75,9 @@ func NewSyslogAMQPAdapter(route *router.Route) (router.LogAdapter, error) {
 		scheme = "amqps://"
 	}
 
-  useNslookup := getopt("AMQP_SOCKET_USE_NSLOOKUP", "")
+
   amqpConfig := &amqp.Config{
 		Dial: func (_, address string) (net.Conn, error) {
-			if useNslookup != "" {
-				log.Println("dial address: " + address)
-				addressParts := strings.Split(address, ":")
-				host := addressParts[0]
-				ipString, err := nslookup(host)
-				log.Println("dial ipString: " + ipString)
-				if err != nil {
-					fmt.Printf("DNS resolution of broker hostname (%s) failed!!  error: %s", host, err)
-				} else {
-					if len(addressParts) == 2 {
-						address = fmt.Sprintf("%s:%s", ipString, addressParts[1])
-					} else {
-						address = ipString
-					}
-				}
-			}
 
 			return transport.Dial(address, route.Options)
 		},
