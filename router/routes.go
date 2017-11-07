@@ -107,6 +107,8 @@ func (rm *RouteManager) AddFromURI(uri string) error {
 				r.FilterName = value
 			case "filter.labels":
 				r.FilterLabels = strings.Split(value, ",")
+			case "filter.labels.exclude":
+				r.FilterLabelsExclude = strings.Split(value, ",")
 			case "filter.sources":
 				r.FilterSources = strings.Split(value, ",")
 			default:
