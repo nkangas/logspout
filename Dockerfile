@@ -3,8 +3,6 @@ ENTRYPOINT ["/src/entrypoint.sh"]
 VOLUME /mnt/routes
 EXPOSE 80
 
-COPY ./build-env.sh /src/
-COPY ./build-glide.sh ./glide.yaml ./glide.lock /src/
 COPY . /src/
 RUN cd /src && ./build-env.sh \
        && ./build-glide.sh \
