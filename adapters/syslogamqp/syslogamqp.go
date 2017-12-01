@@ -70,11 +70,13 @@ func NewSyslogAMQPAdapter(route *router.Route) (router.LogAdapter, error) {
 		return nil, errors.New("transport not found: " + route.Adapter)
 	}
 
+
 	scheme := "amqp://"
+	/*
 	if transportName == "tls" {
 		scheme = "amqps://"
 	}
-
+  */
 
   amqpConfig := &amqp.Config{
 		Dial: func (_, address string) (net.Conn, error) {
