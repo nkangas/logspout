@@ -146,7 +146,7 @@ func NewSyslogAMQPAdapter(route *router.Route) (router.LogAdapter, error) {
 		route:      route,
 		channel:   channel,
 		exchange:   getopt("AMQP_EXCHANGE", "logspout"),
-		routingKey: getopt("AMQP_ROUTING_KEY", "default"),
+		routingKey: getopt("AMQP_ROUTING_KEY", "defaulttest"),
 		tmpl:       tmpl,
 	}, nil
 }
