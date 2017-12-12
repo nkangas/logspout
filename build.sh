@@ -7,7 +7,7 @@ cd /go/src/github.com/gliderlabs/logspout
 #ls -lah
 export GOPATH=/go
 $GOPATH/bin/glide update && $GOPATH/bin/glide install
-go build -ldflags "-X main.Version=$1" -gcflags='-N -l' -o /bin/logspout
+go build -ldflags "-X main.Version=$1" -gcflags='-N -l' -a -o /bin/logspout
 apk del go git mercurial build-base
 rm -rf /go /var/cache/apk/* /root/.glide
 
