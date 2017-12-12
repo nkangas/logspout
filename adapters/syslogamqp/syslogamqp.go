@@ -184,9 +184,12 @@ func (a *AMQPAdapter) Stream(logstream chan *router.Message) {
 			Body:buf,
 		}
 
+		routingKeyTmpl, err := template.New("syslog").Parse("%s")
+		routingKeyBuf, err := m.Render(routingKeyTmpl)
+
 		err = a.channel.Publish(
 			a.exchange, // exchange
-			a.routingKey, // routing key
+			string(routingKeyBuf), // routing key
 			false, // mandatory
 			false, //immediate
 			amqpMessage,
