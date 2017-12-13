@@ -184,7 +184,7 @@ func (a *AMQPAdapter) Stream(logstream chan *router.Message) {
 			Body:buf,
 		}
 
-		tmplStrs := fmt.Sprintf("%s\n", a.routingKey)
+		tmplStrs := fmt.Sprintf("%s", a.routingKey)
 
 		routingKeyTmpl, err := template.New("syslog").Parse(tmplStrs)
 		routingKeyBuf, err := m.Render(routingKeyTmpl)
