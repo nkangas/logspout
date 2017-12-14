@@ -140,14 +140,23 @@ func NewSyslogAMQPAdapter(route *router.Route) (router.LogAdapter, error) {
 	if err != nil {
 		return nil, err
 	}
+    //{{index .Container.Config.Labels "com.peoplenet.logspout-amqp-routing-key"}}
+	routingKeyTmpl, err := template.New("AMQP_ROUTING_KEY").Parse(getopt("AMQP_ROUTING_KEY", "default"))
+	if err != nil {
+		return nil, err
+	}
+
 	return &AMQPAdapter {
 	  amqpURI:    amqpURI,
 	  amqpConfig: amqpConfig,
 		route:      route,
 		channel:   channel,
 		exchange:   getopt("AMQP_EXCHANGE", "logspout"),
-		routingKey: getopt("AMQP_ROUTING_KEY", "{{.Container.Config.Labels.test}}"),
+		omitWithEmptyRoutingKey: getopt("AMQP_REQUIRE_ROUTING_KEY", "false") == "false",
+		omitWithDefaultRoutingKey: getopt("AMQP_REQUIRE_NON_DEFAULT_ROUTING_KEY", "false") == "false",
+		routingKeyTmpl: routingKeyTmpl,
 		tmpl:       tmpl,
+
 	}, nil
 }
 
@@ -158,7 +167,9 @@ type AMQPAdapter struct {
 	transport  *router.AdapterTransport
 	channel    *amqp.Channel
 	exchange   string
-	routingKey string
+	routingKeyTmpl *template.Template
+	omitWithEmptyRoutingKey bool
+	omitWithDefaultRoutingKey bool
 	route      *router.Route
 	tmpl       *template.Template
 }
@@ -184,21 +195,33 @@ func (a *AMQPAdapter) Stream(logstream chan *router.Message) {
 			Body:buf,
 		}
 
-		tmplStrs := fmt.Sprintf("%s", a.routingKey)
+		routingKeyBuf, err := m.Render(a.routingKeyTmpl)
+		var routingKey string
+		if err != nil {
+			log.Println("Error executing Routing Key template, using \"default\" as the routing key:", err)
+			routingKey = "default"
+		} else {
+			routingKey = string(routingKeyBuf)
+		}
 
-		routingKeyTmpl, err := template.New("syslog").Parse(tmplStrs)
-		routingKeyBuf, err := m.Render(routingKeyTmpl)
+		if routingKey == "" && a.omitWithEmptyRoutingKey {
+			continue
+		}
+		if routingKey == "default" && a.omitWithDefaultRoutingKey {
+			continue
+		}
+
 
 		err = a.channel.Publish(
 			a.exchange, // exchange
-			string(routingKeyBuf), // routing key
+			routingKey, // routing key
 			false, // mandatory
 			false, //immediate
 			amqpMessage,
 		)
 
 		if err != nil {
-			if err = a.retry(amqpMessage, err); err != nil {
+			if err = a.retry(amqpMessage, routingKey, err); err != nil {
 				log.Println("syslog retry err:", err)
 				return
 			}
@@ -206,10 +229,10 @@ func (a *AMQPAdapter) Stream(logstream chan *router.Message) {
 	}
 }
 
-func (a *AMQPAdapter) retry(amqpMessage amqp.Publishing, err error) error {
+func (a *AMQPAdapter) retry(amqpMessage amqp.Publishing, routingKey string, err error) error {
 	if opError, ok := err.(*net.OpError); ok {
 		if (opError.Temporary() && opError.Err.Error() != econnResetErrStr) || opError.Timeout() {
-			retryErr := a.retryTemporary(amqpMessage)
+			retryErr := a.retryTemporary(amqpMessage, routingKey)
 			if retryErr == nil {
 				return nil
 			}
@@ -218,7 +241,7 @@ func (a *AMQPAdapter) retry(amqpMessage amqp.Publishing, err error) error {
 	if reconnErr := a.reconnect(); reconnErr != nil {
 		return reconnErr
 	}
-	if err = a.retryTemporary(amqpMessage); err != nil {
+	if err = a.retryTemporary(amqpMessage, routingKey); err != nil {
 		log.Println("syslog: reconnect failed")
 		return err
 	}
@@ -226,12 +249,13 @@ func (a *AMQPAdapter) retry(amqpMessage amqp.Publishing, err error) error {
 	return nil
 }
 
-func (a *AMQPAdapter) retryTemporary(amqpMessage amqp.Publishing) error {
+func (a *AMQPAdapter) retryTemporary(amqpMessage amqp.Publishing, routingKey string) error {
 	log.Printf("syslog: retrying amqp publish up to %v times\n", retryCount)
 	err := retryExp(func() error {
+
 		err := a.channel.Publish(
 			a.exchange, // exchange
-			a.routingKey, // routing key
+			routingKey, // routing key
 			false, // mandatory
 			false, //immediate
 			amqpMessage,
